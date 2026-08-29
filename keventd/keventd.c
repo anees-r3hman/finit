@@ -660,7 +660,7 @@ static int usage(int rc)
 		"  -h        Show this help text\n"
 		"  -n        Run in foreground (no daemon)\n"
 		"  -p        Passive mode: power supply events only (no device management)\n"
-		"  -r DIR    Extra rules directory (in addition to standard udev paths)\n"
+		"  -r DIR    Extra rules directory, overrides the standard udev paths\n"
 		"  -S        Settle: wait until kernel uevent queue is quiet, then exit\n"
 		"  -t SEC    Settle timeout in seconds (default: 30, with -S)\n"
 		"  -v        Show version\n"

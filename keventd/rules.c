@@ -22,10 +22,10 @@
  */
 
 #include <ctype.h>
-#include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <fnmatch.h>
+#include <glob.h>
 #include <grp.h>
 #include <limits.h>
 #include <pwd.h>
@@ -50,6 +50,7 @@
 #include "rules.h"
 #include "sysfs.h"
 #include "udevdb.h"
+#include "util.h"
 
 /* ----- key-name lookup -------------------------------------------------- */
 
@@ -347,12 +348,6 @@ static int parse_rule_line(struct rule *r, char *src)
 
 /* ----- file loading ----------------------------------------------------- */
 
-static int rules_dirent_filter(const struct dirent *e)
-{
-	size_t l = strlen(e->d_name);
-	return l > 6 && !strcmp(e->d_name + l - 6, ".rules");
-}
-
 int rules_load(struct rule_list *list, const char *path)
 {
 	char line[2048], cont[4096];
@@ -416,46 +411,73 @@ int rules_load(struct rule_list *list, const char *path)
 	return nrules;
 }
 
+static int rule_file_cmp(const void *a, const void *b)
+{
+	return strcmp(basenm(*(char *const *)a), basenm(*(char *const *)b));
+}
+
 int rules_load_all(struct rule_list *list, const char *extra_dir)
 {
-	static const char *std_dirs[] = {
+	/*
+	 * Like udev: a file masks one of the same name in an earlier
+	 * (lower priority) directory, and the survivors are sorted
+	 * together by filename, whichever directory they live in.  A
+	 * symlink to /dev/null thus disables the file it shadows.
+	 */
+	const char *dir[] = {	/* in priority order, lowest first */
 		"/lib/udev/rules.d",
 		"/run/udev/rules.d",
 		"/etc/udev/rules.d",
-		NULL
+		extra_dir
 	};
-	const char *dirs[8];
-	int ndirs = 0, total = 0, d;
+	int flags = GLOB_NOESCAPE, total = 0;
+	size_t i, j, nfiles = 0;
+	char **files;
+	glob_t gl;
 
-	for (d = 0; std_dirs[d]; d++)
-		dirs[ndirs++] = std_dirs[d];
+	for (i = 0; i < NELEMS(dir); i++) {
+		char pattern[PATH_MAX];
 
-	if (extra_dir)
-		dirs[ndirs++] = extra_dir;
-	dirs[ndirs] = NULL;
-
-	for (d = 0; d < ndirs; d++) {
-		struct dirent **ents = NULL;
-		char path[PATH_MAX];
-		int n, i;
-
-		n = scandir(dirs[d], &ents, rules_dirent_filter, alphasort);
-		if (n < 0)
+		if (!dir[i])
 			continue;
 
-		for (i = 0; i < n; i++) {
-			int rc;
-
-			snprintf(path, sizeof(path), "%s/%s", dirs[d], ents[i]->d_name);
-			rc = rules_load(list, path);
-			if (rc > 0) {
-				logit(LOG_DEBUG, "rules: %d rules from %s", rc, path);
-				total += rc;
-			}
-			free(ents[i]);
-		}
-		free(ents);
+		snprintf(pattern, sizeof(pattern), "%s/*.rules", dir[i]);
+		glob(pattern, flags, NULL, &gl);
+		flags |= GLOB_APPEND;
 	}
+
+	files = calloc(gl.gl_pathc, sizeof(char *));
+	if (!files) {
+		globfree(&gl);
+		return 0;
+	}
+
+	for (i = 0; i < gl.gl_pathc; i++) {
+		/* masked by the same name in a later directory? */
+		for (j = i + 1; j < gl.gl_pathc; j++) {
+			if (!strcmp(basenm(gl.gl_pathv[i]), basenm(gl.gl_pathv[j])))
+				break;
+		}
+		if (j < gl.gl_pathc)
+			continue;
+
+		files[nfiles++] = gl.gl_pathv[i];
+	}
+
+	qsort(files, nfiles, sizeof(char *), rule_file_cmp);
+
+	for (i = 0; i < nfiles; i++) {
+		int rc;
+
+		rc = rules_load(list, files[i]);
+		if (rc > 0) {
+			logit(LOG_DEBUG, "rules: %d rules from %s", rc, files[i]);
+			total += rc;
+		}
+	}
+
+	free(files);
+	globfree(&gl);
 
 	if (total)
 		logit(LOG_NOTICE, "rules: %d rules loaded", total);
