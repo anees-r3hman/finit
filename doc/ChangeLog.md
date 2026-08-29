@@ -3,117 +3,156 @@ Change Log
 
 All relevant changes are documented in this file.
 
-[Unreleased]
-------------
+[5.0][UNRELEASED]
+--------------------
 
 ### Changes
 
-- The generated `/run/finit/system/*.conf` files for built-in services
-  (keventd, watchdogd, runparts) are now read before
-  `/lib/finit/system/*.conf` instead of after.  Built-ins can now be
-  referenced in `if:` statements from system .conf files and overridden
-  by name from both `/lib/finit/system` and `/etc/finit.d`, the latter
-  is still always read last
-- The `dbus.so` plugin, which starts an external `dbus-daemon`, is now
-  enabled by default.  It does nothing on systems without a
-  `dbus-daemon` installed, and `--disable-dbus-plugin` opts out.  The
-  daemon it used to register from C now lives in `20-dbus.conf`, and
-  the directories it needs in `tmpfiles.d/dbus.conf`, so both can be
-  overridden from `/etc` like any other system file.  Those
-  directories are no longer chowned to `messagebus`, matching how
-  Finit ships directories for other daemons
-- The `tty` block takes `passenv`, which the line-based format has had
-  since v4.4 (issue #286) and the block format was missing
-- New `provides` setting for run/task/service/sysv blocks, naming
-  conditions the service asserts in addition to its own `pid/<ident>`.
-  Lets variants of one service, qualified with `if`, share the barrier
-  condition downstream services wait for, which a block title alone
-  could not express.  Any namespace is allowed, and a second claim on
-  the same condition is refused with a warning naming the owner
-- The `command` setting in a block takes a list of candidates for the
-  same service, `command = { "/lib/systemd/systemd-udevd", "-udevd" }`,
-  and Finit starts the first one it finds.  The line-based format could
-  only express this by repeating the whole stanza per candidate
-- Finit now ships with a built-in brokerless D-Bus implementation,
-  **libink**, exposing the running init system as a peer on its own
-  private bus at `/run/finit/bus`, and -- opportunistically --
-  registering `org.finit` on the standard system bus when a
-  `dbus-daemon` is reachable.  No external `libdbus`/`sd-bus`/`GIO`
-  dependency.  The bus implements the stock `org.freedesktop.DBus`,
-  `Peer`, `Introspectable`, and `Properties` interfaces.
-  See [D-Bus Integration](dbus.md) for the full surface, build flag,
-  and `dbus-send`/`dbus-monitor` examples
-- New `org.finit.Manager1` interface at `/org/finit/manager`:
-  `ListServices`, `GetService`, `Start`/`Stop`/`Restart`/`Reload`,
-  `SetRunlevel`, `SetDebug`, `Signal`, `Suspend`, and the
-  `Reboot`/`Halt`/`Poweroff` triplet, which take a timeout argument
-  arming the emergency shutdown bypass like `initctl -t`.  Read-only
-  properties `Runlevel`, `PrevRunlevel`, `Version`; signals
+- keventd is now a full device manager, promoted from the power supply
+  monitor it was in v4, and the device management defaults have swapped:
+  keventd is enabled by default (`--without-keventd` opts out, libblkid is
+  required to build it), while the hotplug plugin, which runs an external
+  `udevd`, `mdevd`, or `mdev`, is now opt-in.  With the plugin enabled,
+  keventd steps back to passive mode and monitors only power supply
+  events, as before.  As the system device manager it replaces mdev,
+  mdevd, and udevd, and handles:
+
+    * udev rules: an engine covering most of the udev(7) grammar --
+      parent-chain matching, `PROGRAM`/`RESULT`, `IMPORT`, `RUN`,
+      `GOTO`/`LABEL`, and the standard substitutions -- reading the usual
+      `udev/rules.d` directories under `/lib`, `/run`, and `/etc` with
+      udev's precedence and masking.  A curated ruleset derived from eudev
+      3.2.14 is installed by default, `--without-udev-rules` skips it.
+      See [Device Manager](keventd.md) for the supported subset and the
+      few deliberate divergences
+
+    * builtins used by the ruleset: `blkid`, `hwdb`, `input_id`, `kmod`,
+      `net_id`, `path_id`, and `usb_id`
+
+    * device nodes with per-subsystem default permissions, persistent
+      symlinks (`/dev/disk/by-uuid`, `by-label`, `by-id`, `by-path`, plus
+      `by-id`/`by-path` for input, serial, sound, v4l, and tape), kernel
+      firmware load requests, and module loading from `MODALIAS`
+
+    * predictable network interface names via the eudev ruleset,
+      `net.ifnames=0` on the kernel command line keeps classic names.
+      **Note:** switching a system over to keventd can rename its NICs
+
+    * coldplug: as device manager keventd starts with `-c`, replaying add
+      events for hardware present at boot.  The `pid/keventd` condition
+      is deferred until the coldplug queue has drained, so services
+      gating on it can assume `/dev` is populated and symlinks are live
+
+    * `keventd -S`, the `udevadm settle` equivalent, asks the running
+      daemon over D-Bus and falls back to polling the kernel's uevent
+      sequence number
+
+    * libudev compatibility: per-device properties in `/run/udev/data`
+      and processed uevents rebroadcast to netlink group 0x4, so
+      libudev-zero consumers, e.g. compositors and libinput, see hotplug
+      events
+
+    * new conditions for the service engine: `dev/<node>` for device
+      nodes, `class/<subsystem>/<name>` for sysfs class devices without a
+      node (LEDs, IIO, DSA ports), and `driver/<name>`, asserted while a
+      driver is bound to at least one device
+
+- Generated `/run/finit/system/*.conf` files for bundled services (keventd,
+  watchdogd, runparts) are now read before `/lib/finit/system/*.conf` instead
+  of after.  Built-ins can now be referenced in `if:` statements from system
+  .conf files and overridden by name from both `/lib/finit/system` and
+  `/etc/finit.d`, the latter is still always read last
+- The `dbus.so` plugin, which starts an external `dbus-daemon`, is now enabled
+  by default.  It does nothing on systems without a `dbus-daemon` installed,
+  and `--disable-dbus-plugin` opts out.  The daemon it used to register from C
+  now lives in `20-dbus.conf`, and the directories it needs in
+  `tmpfiles.d/dbus.conf`, so both can be overridden from `/etc` like any other
+  system file.  Those directories are no longer chowned to `messagebus`,
+  matching how Finit ships directories for other daemons
+- The `tty` block takes `passenv`, which the line-based format has had since
+  v4.4 (issue #286) and the block format was missing
+- New `provides` setting for run/task/service/sysv blocks, naming conditions
+  the service asserts in addition to its own `pid/<ident>`.  Lets variants of
+  one service, qualified with `if`, share the barrier condition downstream
+  services wait for, which a block title alone could not express.  Any
+  namespace is allowed, and a second claim on the same condition is refused
+  with a warning naming the owner
+- The `command` setting in a block takes a list of candidates for the same
+  service, `command = { "/lib/systemd/systemd-udevd", "-udevd" }`, and Finit
+  starts the first one it finds.  The line-based format could only express
+  this by repeating the whole stanza per candidate
+- Finit now ships with a built-in brokerless D-Bus implementation, **libink**,
+  exposing the running init system as a peer on its own private bus at
+  `/run/finit/bus`, and -- opportunistically -- registering `org.finit` on the
+  standard system bus when a `dbus-daemon` is reachable.  No external
+  `libdbus`/`sd-bus`/`GIO` dependency.  The bus implements the stock
+  `org.freedesktop.DBus`, `Peer`, `Introspectable`, and `Properties`
+  interfaces.  See [D-Bus Integration](dbus.md) for the full surface, build
+  flag, and `dbus-send`/`dbus-monitor` examples
+- New `org.finit.Manager1` interface at `/org/finit/manager`: `ListServices`,
+  `GetService`, `Start`/`Stop`/`Restart`/`Reload`, `SetRunlevel`, `SetDebug`,
+  `Signal`, `Suspend`, and the `Reboot`/`Halt`/`Poweroff` triplet, which take
+  a timeout argument arming the emergency shutdown bypass like `initctl -t`.
+  Read-only properties `Runlevel`, `PrevRunlevel`, `Version`; signals
   `ServiceStateChanged (sss)` and `RunlevelChanged (ss)`
-- New `org.finit.Service1` interface at `/org/finit/service/<encoded>`,
-  one object per loaded service, with `Start`/`Stop`/`Restart`/`Reload`
-  for working off an object handle rather than passing the identity
-  string around
-- New `org.finit.Cond1` interface at `/org/finit/cond`: `Get`, `Set`,
-  `Clear`, `List`, `Dump` for [user-defined conditions](conditions.md),
-  with a `ConditionChanged (ss)` signal
-- keventd serves `org.finit.Device1` on its own bus at
-  `/run/keventd/bus`: `Settle`, `Trigger`, `Info`, `RulesReload`,
-  queue-state properties, and a `DeviceProcessed (ss)` signal.  The
-  `udevadm` settle/trigger/info equivalents are thereby bus methods
-  and `keventd -S` asks the running daemon first.  Finit also gained a
-  `Manager1.ConfigReloaded` signal, fired when `initctl reload`
-  completes, for external condition providers and monitoring
-- Privileged D-Bus methods accept root and members of the
-  `--with-group` group; everyone else is refused.  On the local bus
-  the caller's uid and groups come straight from the kernel
-  (`SO_PEERCRED` + `SO_PEERGROUPS`), so the check never blocks PID 1
-  on an NSS lookup.  Over the system bus the uid is resolved from the
-  broker (`GetConnectionUnixUser`) and privileged methods are
-  root-only.  Read-only methods are open
+- New `org.finit.Service1` interface at `/org/finit/service/<encoded>`, one
+  object per loaded service, with `Start`/`Stop`/`Restart`/`Reload` for
+  working off an object handle rather than passing the identity string around
+- New `org.finit.Cond1` interface at `/org/finit/cond`: `Get`, `Set`, `Clear`,
+  `List`, `Dump` for [user-defined conditions](conditions.md), with a
+  `ConditionChanged (ss)` signal
+- keventd serves `org.finit.Device1` on its own bus at `/run/keventd/bus`:
+  `Settle`, `Trigger`, `Info`, `RulesReload`, queue-state properties, and a
+  `DeviceProcessed (ss)` signal.  The `udevadm` settle/trigger/info
+  equivalents are thereby bus methods and `keventd -S` asks the running daemon
+  first.  Finit also gained a `Manager1.ConfigReloaded` signal, fired when
+  `initctl reload` completes, for external condition providers and monitoring
+- Privileged D-Bus methods accept root and members of the `--with-group`
+  group; everyone else is refused.  On the local bus the caller's uid and
+  groups come straight from the kernel (`SO_PEERCRED` + `SO_PEERGROUPS`), so
+  the check never blocks PID 1 on an NSS lookup.  Over the system bus the uid
+  is resolved from the broker (`GetConnectionUnixUser`) and privileged methods
+  are root-only.  Read-only methods are open
+- `initctl` now transparently routes through D-Bus when the bus is reachable,
+  with the legacy `INIT_SOCKET` transport as a fallback: `start`, `stop`,
+  `restart`, `reload`, `reload <svc>`, `reboot`, `halt`, `poweroff`,
+  `suspend`, `debug`, `signal`, `runlevel`, and `cond {get,set,clr}` all use
+  the new path.  Two new subcommands show up that have no legacy equivalent:
 
-- `initctl` now transparently routes through D-Bus when the bus is
-  reachable, with the legacy `INIT_SOCKET` transport as a fallback:
-  `start`, `stop`, `restart`, `reload`, `reload <svc>`, `reboot`,
-  `halt`, `poweroff`, `suspend`, `debug`, `signal`, `runlevel`, and
-  `cond {get,set,clr}` all use the new path.  Two new subcommands
-  show up that have no legacy equivalent:
-
-    * `initctl monitor` -- streams every signal on the bus to the
-      terminal, one line per delivery (`HH:MM:SS iface.member(args)`),
-      until interrupted.  Same idea as `dbus-monitor`, but scoped to
-      Finit and with no address plumbing required.
+    * `initctl monitor` -- streams every signal on the bus to the terminal,
+      one line per delivery (`HH:MM:SS iface.member(args)`), until
+      interrupted.  Same idea as `dbus-monitor`, but scoped to Finit and with
+      no address plumbing required.
 
     * Issuing `initctl cond set/clr` over D-Bus also fires the
-      `Cond1.ConditionChanged` signal, so observers see user-driven
-      state changes the same way they see service-driven ones.
+      `Cond1.ConditionChanged` signal, so observers see user-driven state
+      changes the same way they see service-driven ones.
 
 - Restart log now spells out the signal name and flags core dumps,
-  e.g. `killed by SIGKILL` or `killed by SIGSEGV, core dumped`, in
-  place of the bare numeric `by signal: N`.  Gives operators a much
-  stronger breadcrumb when a daemon dies unexpectedly
+  e.g. `killed by SIGKILL` or `killed by SIGSEGV, core dumped`, in place of
+  the bare numeric `by signal: N`.  Gives operators a much stronger breadcrumb
+  when a daemon dies unexpectedly
 
 ### Fixes
 
-- Reject a .conf file that declares the same block title twice.  The
-  title is the service identity and libConfuse merges two sections
-  sharing one, so the file loaded as a single service holding a mix of
-  both declarations, silently.  This hit `system/10-hotplug.conf`,
-  where the two `udevd` blocks left only the second command, dropping
-  the service on systems that only have `systemd-udevd`.  The same
-  title in another file is still how a system .conf is overridden
-- Remove stale daemon-owned (`pid:!`) pidfiles after unclean exits.
-  When a daemon dies via SIGKILL/OOM/segfault, or exits early during
-  startup, its pidfile lingers and can prevent the next instance from
-  starting -- `dbus-daemon` for example refuses to start when its
-  pidfile already exists, so Finit's restart loop gives up.  Finit now
-  drops the file when it still names the just-reaped PID and that PID
-  is no longer alive (the liveness check guards against PID reuse).
-  This is a controlled exception to the long-standing rule that Finit
-  does not touch service-owned pidfiles
-- Fix misspelled `SIGUNKOWN` returned by `sig_name()` for unknown
-  signal numbers, now spelled correctly as `SIGUNKNOWN`.  Surfaced by
-  the new restart log above
+- Reject a .conf file that declares the same block title twice.  The title is
+  the service identity and libConfuse merges two sections sharing one, so the
+  file loaded as a single service holding a mix of both declarations,
+  silently.  This hit `system/10-hotplug.conf`, where the two `udevd` blocks
+  left only the second command, dropping the service on systems that only have
+  `systemd-udevd`.  The same title in another file is still how a system .conf
+  is overridden
+- Remove stale daemon-owned (`pid:!`) pidfiles after unclean exits.  When a
+  daemon dies via SIGKILL/OOM/segfault, or exits early during startup, its
+  pidfile lingers and can prevent the next instance from starting --
+  `dbus-daemon` for example refuses to start when its pidfile already exists,
+  so Finit's restart loop gives up.  Finit now drops the file when it still
+  names the just-reaped PID and that PID is no longer alive (the liveness
+  check guards against PID reuse).  This is a controlled exception to the
+  long-standing rule that Finit does not touch service-owned pidfiles
+- Fix misspelled `SIGUNKOWN` returned by `sig_name()` for unknown signal
+  numbers, now spelled correctly as `SIGUNKNOWN`.  Surfaced by the new restart
+  log above
 
 [4.17][] - 2026-04-28
 ---------------------
