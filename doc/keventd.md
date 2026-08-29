@@ -74,6 +74,115 @@ device subsystem and name:
 | (default)     |                                            | 0660     | root:root       |
 
 
+udev Rules
+----------
+
+Rules are read from `/lib/udev/rules.d/`, `/run/udev/rules.d/`, and
+`/etc/udev/rules.d/`, plus any directory passed with `-r`.  Files need a
+`.rules` suffix.  Like udev, all files sort together by filename,
+whichever directory they live in, and a file masks one of the same name
+in an earlier directory: `/etc/` overrides `/run/`, which overrides
+`/lib/`, and the `-r` directory overrides them all.  A symlink to
+`/dev/null` in `/etc/udev/rules.d/` disables the `/lib/` file of the
+same name.
+
+The syntax is the one described in [udev(7)][].  What follows is the
+subset keventd understands, not a second copy of the grammar.  To pick up
+edited rules, call `RulesReload` on
+[`org.finit.Device1`](#d-bus-interface-orgfinitdevice1).  `initctl reload`
+does not touch them.
+
+### Match Keys
+
+| **Key**                                           | **Matches**                                                              |
+|---------------------------------------------------|--------------------------------------------------------------------------|
+| `ACTION`                                          | `add`, `remove`, `change`, `move`, `bind`, `unbind`, `online`, `offline` |
+| `DEVPATH`                                         | kernel device path, without the `/sys` prefix                            |
+| `KERNEL`                                          | sysfs name of the device                                                 |
+| `NAME`                                            | device node name                                                         |
+| `SUBSYSTEM`, `DRIVER`                             | subsystem and bound driver                                               |
+| `ATTR{file}`                                      | sysfs attribute of the device                                            |
+| `SYSCTL{param}`                                   | value under `/proc/sys/`                                                 |
+| `ENV{key}`                                        | uevent property, including ones set by earlier rules                     |
+| `CONST{key}`                                      | `arch`; `virt` reports `container` or nothing                            |
+| `TAG`                                             | tag set by an earlier `TAG+=`                                            |
+| `TEST{octal}`                                     | file exists, optionally with the given permission bits                   |
+| `PROGRAM`                                         | exit status of a program, output kept for `RESULT` and `%c`              |
+| `RESULT`                                          | output of the last `PROGRAM`                                             |
+| `KERNELS`, `SUBSYSTEMS`, `DRIVERS`, `ATTRS{file}` | the device or any of its parents, see below                              |
+
+Values match literally, as an `fnmatch()` glob, or as `a|b|c` alternatives.
+Both `==` and `!=` work everywhere.
+
+`SECLABEL`, `OPTIONS`, and `TAGS` parse but do nothing.  Rules using them load
+without complaint and the key is skipped, so `OPTIONS+="static_node=..."`,
+`link_priority=`, `string_escape=`, and `watch` have no effect, and a `TAGS==`
+match never succeeds.
+
+### The Parent Chain
+
+`ATTR{}` reads an attribute of the device the event fired for.  `ATTRS{}` also
+looks at the parents, walking up the sysfs tree until one matches.  For a
+keyboard behind a hub:
+
+    /sys/devices/.../usb2/         <- root hub
+                  usb2/2-1/        <- hub
+                  usb2/2-1/2-1.4/  <- keyboard, event fires here
+
+`ATTRS{authorized_default}=="1"` finds no such attribute on the keyboard or
+the hub, reaches the root hub, and matches there.  `KERNELS`, `SUBSYSTEMS`,
+and `DRIVERS` do the same for a parent's name, subsystem, and driver.
+
+Each of these keys walks the chain on its own.  udev requires all the parent
+keys in one rule to match on the *same* parent, so a rule pairing
+`SUBSYSTEMS=="usb"` with `ATTRS{idVendor}=="1d6b"` is looser here: the two may
+land on different ancestors.  Where that matters, match on one attribute
+specific enough to identify the device by itself.
+
+### Assignments
+
+| **Key**                     | **Effect**                                                               |
+|-----------------------------|--------------------------------------------------------------------------|
+| `NAME=`                     | name of the device node                                                  |
+| `SYMLINK=`, `+=`            | symlinks to create, space separated, relative to `/dev`                  |
+| `OWNER=`, `GROUP=`, `MODE=` | ownership and permissions of the node                                    |
+| `ENV{key}=`, `+=`, `-=`     | set, append to, or clear a property                                      |
+| `TAG+=`, `-=`               | tags for later `TAG==` matching                                          |
+| `RUN+=`                     | program to run once the event is handled, `RUN{builtin}+=` for a builtin |
+| `IMPORT{type}`              | `program`, `file`, `db`, `builtin`, `parent`, `cmdline`                  |
+| `ATTR{file}=`               | write to a sysfs attribute                                               |
+| `SYSCTL{param}=`            | write to `/proc/sys/`                                                    |
+| `LABEL=`, `GOTO=`           | skip ahead to a label                                                    |
+
+`:=` locks `MODE`, `OWNER`, and `GROUP` against later rules the way udev
+does.  On `NAME` and `ENV{}` it behaves like plain `=` and locks nothing,
+and `SYMLINK:=` is dropped without a word.
+
+`IMPORT{builtin}` and `RUN{builtin}` can call `blkid`, `hwdb`,
+`input_id`, `kmod`, `net_id`, `path_id`, and `usb_id`.
+
+### Substitutions
+
+| **Long**           | **Short**     | **Expands to**                     |
+|--------------------|---------------|------------------------------------|
+| `$kernel`          | `%k`          | sysfs name of the device           |
+| `$devpath`         | `%p`          | kernel device path                 |
+| `$name`            | `%N`, `%D`    | device node name                   |
+| `$major`, `$minor` | `%M`, `%m`    | device numbers                     |
+| `$driver`          | `%d`          | bound driver                       |
+| `$attr{file}`      | `%s{file}`    | sysfs attribute of the device      |
+| `$env{key}`        |               | uevent property                    |
+| `$result`          | `%c`, `%c{N}` | `PROGRAM` output, or its Nth field |
+| `$root`            |               | `/dev`                             |
+| `$sys`             |               | `/sys`                             |
+|                    | `%n`          | trailing digits of the sysfs name  |
+|                    | `%b`          | `major:minor`                      |
+
+udev's `$id`, `$parent`, `$links`, and `%E{}` are not implemented, and `%b`
+here is the device number pair rather than udev's parent bus id.  An unknown
+specifier is left in the string as written.
+
+
 Persistent Symlinks
 -------------------
 
@@ -319,7 +428,7 @@ Usage
       -h        Show help text
       -n        Run in foreground (no daemon)
       -p        Passive mode: power supply events only
-      -r DIR    Extra rules directory
+      -r DIR    Extra rules directory, overrides the standard udev paths
       -S        Settle mode: wait for kernel uevent queue to quiet, then exit
       -t SEC    Settle timeout (default 30s, used with -S)
       -v        Show version
@@ -425,3 +534,4 @@ system device manager (`keventd -c`).
 
 [libudev-zero]: https://github.com/illiliti/libudev-zero
 [mdevd]:        https://skarnet.org/software/mdevd/
+[udev(7)]:      https://man7.org/linux/man-pages/man7/udev.7.html

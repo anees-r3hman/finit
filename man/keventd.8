@@ -2,7 +2,7 @@
 .\" First parameter, NAME, should be all caps
 .\" Second parameter, SECTION, should be 1-8, maybe w/ subsection
 .\" other parameters are allowed: see man(7), man(1)
-.Dd Aug 16, 2026
+.Dd Aug 29, 2026
 .\" Please adjust this date whenever revising the manpage.
 .Dt KEVENTD 8 SMM
 .Os Linux
@@ -89,7 +89,10 @@ stderr instead of syslog.
 Passive mode: monitor power supply events only, leaving device
 management to an external device manager.
 .It Fl r Ar dir
-Extra udev rules directory, searched after the standard paths.
+Extra udev rules directory.  Takes precedence over the standard paths, a
+file here masks one of the same name in any of them.  See
+.Sx UDEV RULES
+below.
 .It Fl S
 Settle: wait until the device event queue is quiet, then exit 0, or
 non-zero on timeout.  Asks the running
@@ -132,6 +135,29 @@ owned by root:disk, TTY devices to root:tty, and common devices like
 and
 .Pa /dev/zero
 are world-readable (0666).
+.Sh UDEV RULES
+Rules files need a
+.Pa .rules
+suffix.  Like
+.Xr udev 7 ,
+all files sort together by filename, whichever directory they live in,
+and a file masks one of the same name in an earlier directory:
+.Pa /etc/udev/rules.d
+overrides
+.Pa /run/udev/rules.d ,
+which overrides
+.Pa /lib/udev/rules.d ,
+and the
+.Fl r
+directory overrides them all.  A symlink to
+.Pa /dev/null
+disables the file it shadows.
+.Pp
+The rules syntax is described in
+.Xr udev 7 .
+.Nm
+implements a subset; the Finit User's Guide details what is supported
+and where it differs.
 .Sh PERSISTENT SYMLINKS
 For block devices,
 .Nm
@@ -350,7 +376,7 @@ and
 .It Pa /run/finit/cond/sys/pwr/
 Power supply condition symlinks.
 .It Pa /lib/udev/rules.d/ , Pa /run/udev/rules.d/ , Pa /etc/udev/rules.d/
-udev rules, searched in this order.
+udev rules, a later directory overrides an earlier one.
 .It Pa /run/udev/data/
 Per-device property database, libudev compatible.
 .It Pa /run/keventd/bus
@@ -363,6 +389,7 @@ D-Bus socket.
 .Xr finit.conf 5 ,
 .Xr initctl 8 ,
 .Xr mknod 2 ,
-.Xr modprobe 8
+.Xr modprobe 8 ,
+.Xr udev 7
 .Sh AUTHORS
 .An Joachim Wiberg Aq Mt troglobit@gmail.com
