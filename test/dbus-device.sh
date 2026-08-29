@@ -81,7 +81,7 @@ info=$(texec "$CLIENT" call-s "$DEVBUS" /org/finit/device \
 assert "Info answered for dummy0" 0 -eq 0
 
 say "keventd -S settles via the bus"
-run "/libexec/finit/keventd -S -t 15" || fail "keventd -S failed"
+run "$FINIT_EXECPATH/keventd -S -t 15" || fail "keventd -S failed"
 assert "bus-first settle ok" 0 -eq 0
 
 say "Trigger(add, net) re-emits events, DeviceProcessed observed"
