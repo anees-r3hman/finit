@@ -43,8 +43,9 @@ connections are refused until one disconnects.  Match rules given to
 `arg0` and its variants are not implemented.
 
 For the system bus a standard busconfig policy ships in
-`dbus-1/org.finit.conf`: only root may own `org.finit`, unprivileged
-callers reach introspection, properties, and the read-only methods.
+`dbus-1/org.finit.conf`, installed to `$datadir/dbus-1/system.d`: only
+root may own `org.finit`, unprivileged callers reach introspection,
+properties, and the read-only methods.
 Finit also enforces per-method authorization itself, so a permissive
 policy installed by mistake does not open state-changing methods.
 
