@@ -10,7 +10,7 @@
 set -eu
 
 TEST_DIR=$(dirname "$0")
-DRIVER="$TEST_DIR/src/fuzz-msg-parse"
+DRIVER="${top_builddir:-$TEST_DIR/..}/test/src/fuzz-msg-parse"
 
 [ -x "$DRIVER" ] || {
     echo "fuzz-msg-parse not built, D-Bus support is off"
