@@ -5,6 +5,13 @@ set -eu
 # shellcheck disable=SC2154
 make -C "$top_builddir" DESTDIR="$SYSROOT" install
 
+# The dbus-daemon staged from the host links the real libsystemd, ours
+# installs under the same soname and wins the sysroot ld.so cache.  The
+# test serv links sd-daemon.c directly, so drop the library here.
+if [ -d "$top_builddir/libsystemd" ]; then
+	make -C "$top_builddir/libsystemd" DESTDIR="$SYSROOT" uninstall
+fi
+
 mkdir -p "$SYSROOT/sbin/"
 cp "$top_builddir/test/src/serv" "$SYSROOT/sbin/"
 if [ -x "$top_builddir/test/src/dbus-auth-client" ]; then
