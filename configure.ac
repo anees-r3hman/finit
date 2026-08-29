@@ -184,15 +184,15 @@ AC_ARG_WITH(udev-rules,
         AS_HELP_STRING([--without-udev-rules], [Skip install of curated udev rules under /lib/udev/rules.d, default: yes when keventd enabled]),, [with_udev_rules=yes])
 
 AC_ARG_WITH(sulogin,
-        AS_HELP_STRING([--with-sulogin@<:@=USER@:>@], [Enable built-in sulogin, optional USER to request password for (default root), default: no.]),[sulogin=$withval],[with_sulogin=no])
+        AS_HELP_STRING([--with-sulogin@<:@=USER@:>@], [Built-in sulogin, optional USER to request password for, default: yes (root)]),[sulogin=$withval],[with_sulogin=yes sulogin=yes])
 
 AC_ARG_WITH(watchdog,
-        AS_HELP_STRING([--with-watchdog@<:@=DEV@:>@], [Enable built-in watchdog, default: /dev/watchdog]),
-	[watchdog=$withval], [with_watchdog=no watchdog=])
+        AS_HELP_STRING([--with-watchdog@<:@=DEV@:>@], [Built-in watchdog, default: yes (/dev/watchdog)]),
+	[watchdog=$withval], [with_watchdog=yes watchdog=yes])
 
 AC_ARG_WITH(libsystemd,
-        AS_HELP_STRING([--with-libsystemd], [Build replacement libsystemd library, default: yes]),
-	[with_libsystemd=$withval], [with_libsystemd=no])
+        AS_HELP_STRING([--without-libsystemd], [Skip replacement libsystemd library, default: yes]),
+	[with_libsystemd=$withval], [with_libsystemd=yes])
 
 AC_ARG_WITH(hook-scripts-path,
         AS_HELP_STRING([--with-hook-scripts-path=DIR], [Base directory for hook scripts, default $libexecdir/finit/hook]),

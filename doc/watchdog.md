@@ -1,10 +1,10 @@
 Bundled Watchdog Daemon
 =======================
 
-When built `--with-watchdog` a separate service is built and installed
-in `/libexec/finit/watchdogd`.  If this exists at runtime, and the WDT
-device node exists, Finit will start it and treat it as the elected
-watchdog service to delegate its reboot to.  This delegation is to
+A separate service is built and installed in `/libexec/finit/watchdogd`,
+unless disabled with `--without-watchdog`.  If this exists at runtime,
+and the WDT device node exists, Finit will start it and treat it as the
+elected watchdog service to delegate its reboot to.  This delegation is to
 ensure that the system is rebooted by a hardware watchdog timer -- on
 many embedded systems this is crucial to ensure all circuits on the
 board are properly reset for the next boot, in effect ensuring the

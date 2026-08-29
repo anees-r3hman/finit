@@ -46,8 +46,7 @@ jobs:
           ./autogen.sh
           ./configure  --prefix=/usr --exec-prefix= --sysconfdir=/etc  \
                        --localstatedir=/var --enable-x11-common-plugin \
-                       --enable-testserv-plugin --with-watchdog        \
-                       --with-keventd --with-libsystemd
+                       --enable-testserv-plugin
       - name: Enable unprivileged userns (unshare)
         run: |
           sudo sysctl kernel.apparmor_restrict_unprivileged_userns=0

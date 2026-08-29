@@ -63,7 +63,6 @@ release: distcheck
 		printf "$$file.sha256\t"; cat ../$$file.sha256 | cut -f1 -d' ';	\
 	done
 
-DISTCHECK_CONFIGURE_FLAGS = --prefix=/usr --sysconfdir=/etc --localstatedir=/var   \
-			    --enable-testserv-plugin --enable-x11-common-plugin    \
-			    --with-watchdog --with-keventd --with-fstab=/etc/fstab \
-			    --with-libsystemd --with-bash-completion-dir=no
+DISTCHECK_CONFIGURE_FLAGS = --prefix=/usr --sysconfdir=/etc --localstatedir=/var \
+			    --enable-testserv-plugin --enable-x11-common-plugin  \
+			    --with-fstab=/etc/fstab --with-bash-completion-dir=no

@@ -116,8 +116,7 @@ jobs:
       - name: Regular Finit
         run: |
           ./configure --prefix=/usr --exec-prefix= --sysconfdir=/etc --localstatedir=/var \
-                      --enable-x11-common-plugin --enable-testserv-plugin --with-watchdog \
-                      --with-keventd \
+                      --enable-x11-common-plugin --enable-testserv-plugin \
                       CFLAGS="-fsanitize=address -ggdb"
           make -j9 clean
           make -j9 V=1
@@ -173,7 +172,7 @@ jobs:
         run: |
           ./autogen.sh
           ./configure --prefix=/usr --exec-prefix= --sysconfdir=/etc --localstatedir=/var \
-                      --disable-dbus --enable-testserv-plugin --with-keventd
+                      --disable-dbus --enable-testserv-plugin
           make -j9 V=1
       - name: Verify no bus artifacts
         run: |

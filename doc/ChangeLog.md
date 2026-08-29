@@ -69,6 +69,12 @@ All relevant changes are documented in this file.
   `tmpfiles.d/dbus.conf`, so both can be overridden from `/etc` like any other
   system file.  Those directories are no longer chowned to `messagebus`,
   matching how Finit ships directories for other daemons
+- The bundled `sulogin` and `watchdogd`, and the replacement `libsystemd`,
+  are now built and installed by default, like keventd and the D-Bus
+  support.  `--without-sulogin`, `--without-watchdog`, and
+  `--without-libsystemd` opt out.  Note, Finit starts `watchdogd` by
+  itself when the WDT device node exists, and `libsystemd.so` is
+  installed to `$libdir`, where a system with systemd already has one
 - The `tty` block takes `passenv`, which the line-based format has had since
   v4.4 (issue #286) and the block format was missing
 - New `provides` setting for run/task/service/sysv blocks, naming conditions

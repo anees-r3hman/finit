@@ -66,8 +66,7 @@ jobs:
       - name: Configure
         run: |
           ./autogen.sh
-          ./configure --prefix= --enable-x11-common-plugin --with-watchdog \
-                      --with-keventd --with-libsystemd
+          ./configure --prefix= --enable-x11-common-plugin
       - name: Build
         run: |
           export PATH=`pwd`/coverity/bin:$PATH

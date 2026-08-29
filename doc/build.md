@@ -79,9 +79,20 @@ Below are a few of the main switches to configure:
   run mdev, mdevd, or udevd instead.  Enabled by default, and the only
   thing that pulls in libblkid.  See [Bundled Device Manager](keventd.md).
 
-* `--with-sulogin`: Enable bundled `sulogin` program.  Default is to use the
-  system `sulogin(8)`.  The sulogin shipped with Finit *allows password-less*
-  login if the `root` user is disabled or has no password at all.
+* `--without-sulogin`: Drop the bundled `sulogin`, enabled by default,
+  and use the system `sulogin(8)` instead.  The one shipped with Finit
+  *allows password-less* login if the `root` user is disabled or has no
+  password at all.  `--with-sulogin=USER` prompts for another user's
+  password than `root`'s.
+
+* `--without-watchdog`: Drop the bundled `watchdogd`, enabled by default
+  on `/dev/watchdog`, `--with-watchdog=DEV` selects another device.
+  Finit starts it when the device node exists, see [Watchdog](watchdog.md).
+
+* `--without-libsystemd`: Drop the replacement `libsystemd`, built and
+  installed by default, which lets programs that use `sd_notify()` talk
+  to Finit without systemd.  Note, it installs `libsystemd.so` in
+  `$libdir`, where a system with systemd already has one.
 
 For more configure flags, see <kbd>./configure --help</kbd>
 
@@ -108,8 +119,7 @@ Then configure, build and install:
 
 ```shell
 $ ./configure --prefix=/usr                 --exec-prefix=         \
-              --sysconfdir=/etc             --localstatedir=/var   \
-              --with-keventd                --with-watchdog
+              --sysconfdir=/etc             --localstatedir=/var
 $ make
 .
 .
