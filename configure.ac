@@ -191,8 +191,8 @@ AC_ARG_WITH(watchdog,
 	[watchdog=$withval], [with_watchdog=yes watchdog=yes])
 
 AC_ARG_WITH(libsystemd,
-        AS_HELP_STRING([--without-libsystemd], [Skip replacement libsystemd library, default: yes]),
-	[with_libsystemd=$withval], [with_libsystemd=yes])
+        AS_HELP_STRING([--with-libsystemd], [Build replacement libsystemd library, default: no]),
+	[with_libsystemd=$withval], [with_libsystemd=no])
 
 AC_ARG_WITH(hook-scripts-path,
         AS_HELP_STRING([--with-hook-scripts-path=DIR], [Base directory for hook scripts, default $libexecdir/finit/hook]),

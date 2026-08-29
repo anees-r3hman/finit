@@ -89,10 +89,13 @@ Below are a few of the main switches to configure:
   on `/dev/watchdog`, `--with-watchdog=DEV` selects another device.
   Finit starts it when the device node exists, see [Watchdog](watchdog.md).
 
-* `--without-libsystemd`: Drop the replacement `libsystemd`, built and
-  installed by default, which lets programs that use `sd_notify()` talk
-  to Finit without systemd.  Note, it installs `libsystemd.so` in
-  `$libdir`, where a system with systemd already has one.
+* `--with-libsystemd`: Build the replacement `libsystemd`, which lets
+  programs that use `sd_notify()` talk to Finit without systemd.  Off by
+  default because it installs `libsystemd.so.0` in `$libdir`: on a host
+  that has the real one, ours shadows it in the loader cache and every
+  program linking it, `dbus-daemon` and `udevd` included, loses the
+  symbols it needs.  Safe on a systemd-free system, which is the point
+  of it.
 
 For more configure flags, see <kbd>./configure --help</kbd>
 
