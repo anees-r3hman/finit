@@ -69,8 +69,7 @@ jobs:
           path: finit-*/_build/sub/test/*.log
       - name: Extract ChangeLog entry ...
         run: |
-          awk '/-----*/{if (x == 1) exit; x=1;next}x' doc/ChangeLog.md \
-              |head -n -1 > release.md
+          .github/scripts/extract-changelog.sh < doc/ChangeLog.md > release.md
           cat release.md
       - uses: ncipollo/release-action@v1
         with:
