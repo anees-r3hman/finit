@@ -60,7 +60,7 @@ jobs:
           make -j1 release || (cat $dir/test/test-suite.log; false)
           ls -lF ../
           mkdir -p artifacts/
-          mv ../*.tar.* artifacts/
+          mv ../*.tar.gz artifacts/
       - name: Upload Test Results
         if: always()
         uses: actions/upload-artifact@v7
