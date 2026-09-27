@@ -140,6 +140,16 @@ All relevant changes are documented in this file.
   e.g. `killed by SIGKILL` or `killed by SIGSEGV, core dumped`, in place of
   the bare numeric `by signal: N`.  Gives operators a much stronger breadcrumb
   when a daemon dies unexpectedly
+- Service `user:` and `group:` names, including supplementary groups, can
+  now be up to 63 characters, up from 15.  Longer names were silently
+  truncated before the lookup, so the service never started.  By Anees Rehman
+- `stop:` and `reload:` scripts take a timeout of their own, `stop:5,/path`,
+  defaulting to the kill delay as before.  Such a line used to crash Finit at
+  config load
+- Shutdown now stops after the first successful remount of `/` read only.
+  The plain `mount -n -o remount,ro /`, which reads `/etc/fstab`, is only
+  used when both device-agnostic forms fail, the same order as Debian's
+  `umountroot`.  By Anees Rehman
 
 ### Fixes
 
@@ -161,6 +171,12 @@ All relevant changes are documented in this file.
 - Fix misspelled `SIGUNKOWN` returned by `sig_name()` for unknown signal
   numbers, now spelled correctly as `SIGUNKNOWN`.  Surfaced by the new restart
   log above
+- Fix mode of existing `d`/`D` directories in tmpfiles, the chmod branch
+  never ran because the directory creation swallowed `EEXIST`.  Mode and owner
+  of `d`/`D`, `e`, and `f`/`F` entries, and of the service directories
+  `mksubsysd()` creates, are now set through an open fd and only when they
+  differ, so an immutable directory like `/var/empty` no longer warns on every
+  boot.  By Sam Brkopac
 
 [4.17][] - 2026-04-28
 ---------------------
