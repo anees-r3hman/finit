@@ -177,6 +177,11 @@ All relevant changes are documented in this file.
   `mksubsysd()` creates, are now set through an open fd and only when they
   differ, so an immutable directory like `/var/empty` no longer warns on every
   boot.  By Sam Brkopac
+- Fix a lost reload for a service paused mid-reload by a condition in
+  flux.  A second reload arriving meanwhile re-parsed the unchanged .conf
+  and cleared the pending mark, so the service resumed without ever being
+  reloaded.  Seen on Infix, where sshd kept its old listen addresses after
+  a change that landed as two reloads in a row
 
 [4.17][] - 2026-04-28
 ---------------------
